@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "skills": {
+    "agora": {
+      "source": "agoraio/skills",
+      "sourceType": "github",
+      "computedHash": "178ca497347b5f8f6193ee239e242175d62631613ebaf5c9902552206a5cbb9e"
+    },
+    "cloudflare": {
+      "source": "cloudflare/skills",
+      "sourceType": "github",
+      "computedHash": "b1025860ad52bd7183307d21858cad3a811b5bde454b7977ad2f664002956c4b"
+    },
+    "drizzle-orm": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "computedHash": "9aea7469d696c9b5fa54a84b7a92ea692872fb624fb028f866ab0f3deac84867"
+    },
+    "next-best-practices": {
+      "source": "vercel-labs/next-skills",
+      "sourceType": "github",
+      "computedHash": "515ba75178bd44875812d9a560bdf14651f86709f89cf1d4f209638e879807f3"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "computedHash": "507f011a70e8b3ae242bdc0bb5b39fd91a1d4049a0f3c281991ccf84973d591c"
+    }
+  }
+}
