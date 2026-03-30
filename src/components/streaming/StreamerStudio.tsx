@@ -156,55 +156,37 @@ export default function StreamerStudio({
       }
     });
 
-    // Start recording if enabled
+    // Start recording if enabled — grab MediaStreamTrack directly from Agora tracks
     if (saveRecording) {
       try {
-        const videoEl = videoRef.current?.querySelector("video");
-        if (videoEl) {
-          // Wait for video to be playing
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          const canvasEl = document.createElement("canvas");
-          const ctx = canvasEl.getContext("2d")!;
-          canvasEl.width = videoEl.videoWidth || 1280;
-          canvasEl.height = videoEl.videoHeight || 720;
+        const videoMSTrack = videoTrack.getMediaStreamTrack();
+        const audioMSTrack = audioTrack.getMediaStreamTrack();
+        const stream = new MediaStream([videoMSTrack, audioMSTrack]);
 
-          const canvasStream = canvasEl.captureStream(30);
-          // Mix audio
-          const audioCtx = new AudioContext();
-          const dest = audioCtx.createMediaStreamDestination();
-          const audioStream = audioTrack.getMediaStreamTrack();
-          const source = audioCtx.createMediaStreamSource(
-            new MediaStream([audioStream])
-          );
-          source.connect(dest);
-          for (const track of dest.stream.getAudioTracks()) {
-            canvasStream.addTrack(track);
-          }
+        const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+          ? "video/webm;codecs=vp8,opus"
+          : "video/webm";
 
-          // Draw video frames to canvas
-          const drawFrame = () => {
-            if (mediaRecorderRef.current?.state === "recording") {
-              ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-              requestAnimationFrame(drawFrame);
-            }
-          };
+        const recorder = new MediaRecorder(stream, {
+          mimeType,
+          videoBitsPerSecond: 2_500_000,
+        });
 
-          const recorder = new MediaRecorder(canvasStream, {
-            mimeType: "video/webm;codecs=vp8,opus",
-            videoBitsPerSecond: 2_500_000,
-          });
-          recorder.ondataavailable = (e) => {
-            if (e.data.size > 0) recordedChunksRef.current.push(e.data);
-          };
-          mediaRecorderRef.current = recorder;
-          recordedChunksRef.current = [];
-          recordingStartTimeRef.current = Date.now();
-          recorder.start(5000); // collect data every 5s
-          drawFrame();
-        }
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+        };
+        recorder.onerror = (e) => {
+          console.error("MediaRecorder error:", e);
+        };
+
+        mediaRecorderRef.current = recorder;
+        recordedChunksRef.current = [];
+        recordingStartTimeRef.current = Date.now();
+        recorder.start(5000);
+        console.log("Recording started, mimeType:", mimeType);
       } catch (err) {
         console.error("Recording setup failed:", err);
-        toast.error("녹화 시작에 실패했습니다. ���송은 계속됩니다.");
+        toast.error("녹화 시작에 실패했습니다. 방송은 계속됩니다.");
       }
     }
 
@@ -340,15 +322,20 @@ export default function StreamerStudio({
 
   const uploadRecording = async (): Promise<void> => {
     const recorder = mediaRecorderRef.current;
-    if (!recorder || recorder.state === "inactive") return;
+    console.log("uploadRecording called, recorder state:", recorder?.state, "chunks:", recordedChunksRef.current.length);
+
+    if (!recorder) return;
 
     // Stop recorder and wait for final data
-    await new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
-      recorder.stop();
-    });
+    if (recorder.state !== "inactive") {
+      await new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+        recorder.stop();
+      });
+    }
 
     const chunks = recordedChunksRef.current;
+    console.log("Recording chunks:", chunks.length, "total size:", chunks.reduce((a, b) => a + b.size, 0));
     if (chunks.length === 0) return;
 
     setUploading(true);
