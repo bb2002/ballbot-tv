@@ -31,12 +31,16 @@ type Props = {
   streamId: string;
   agoraChannel: string;
   title: string;
+  description?: string;
+  saveRecording?: boolean;
 };
 
 export default function StreamerStudio({
   streamId,
   agoraChannel,
   title,
+  description,
+  saveRecording,
 }: Props) {
   const router = useRouter();
   const videoRef = useRef<HTMLDivElement>(null);
@@ -48,6 +52,7 @@ export default function StreamerStudio({
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string>("");
   const [isScreenShare, setIsScreenShare] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const clientRef = useRef<any>(null);
@@ -55,6 +60,9 @@ export default function StreamerStudio({
   const localAudioRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const localVideoRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingStartTimeRef = useRef<number>(0);
 
   const init = useCallback(async () => {
     const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
@@ -148,8 +156,60 @@ export default function StreamerStudio({
       }
     });
 
+    // Start recording if enabled
+    if (saveRecording) {
+      try {
+        const videoEl = videoRef.current?.querySelector("video");
+        if (videoEl) {
+          // Wait for video to be playing
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const canvasEl = document.createElement("canvas");
+          const ctx = canvasEl.getContext("2d")!;
+          canvasEl.width = videoEl.videoWidth || 1280;
+          canvasEl.height = videoEl.videoHeight || 720;
+
+          const canvasStream = canvasEl.captureStream(30);
+          // Mix audio
+          const audioCtx = new AudioContext();
+          const dest = audioCtx.createMediaStreamDestination();
+          const audioStream = audioTrack.getMediaStreamTrack();
+          const source = audioCtx.createMediaStreamSource(
+            new MediaStream([audioStream])
+          );
+          source.connect(dest);
+          for (const track of dest.stream.getAudioTracks()) {
+            canvasStream.addTrack(track);
+          }
+
+          // Draw video frames to canvas
+          const drawFrame = () => {
+            if (mediaRecorderRef.current?.state === "recording") {
+              ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+              requestAnimationFrame(drawFrame);
+            }
+          };
+
+          const recorder = new MediaRecorder(canvasStream, {
+            mimeType: "video/webm;codecs=vp8,opus",
+            videoBitsPerSecond: 2_500_000,
+          });
+          recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+          };
+          mediaRecorderRef.current = recorder;
+          recordedChunksRef.current = [];
+          recordingStartTimeRef.current = Date.now();
+          recorder.start(5000); // collect data every 5s
+          drawFrame();
+        }
+      } catch (err) {
+        console.error("Recording setup failed:", err);
+        toast.error("녹화 시작에 실패했습니다. ���송은 계속됩니다.");
+      }
+    }
+
     setJoined(true);
-  }, [agoraChannel, streamId]);
+  }, [agoraChannel, streamId, saveRecording]);
 
   useEffect(() => {
     init();
@@ -278,8 +338,77 @@ export default function StreamerStudio({
     }
   };
 
+  const uploadRecording = async (): Promise<void> => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") return;
+
+    // Stop recorder and wait for final data
+    await new Promise<void>((resolve) => {
+      recorder.onstop = () => resolve();
+      recorder.stop();
+    });
+
+    const chunks = recordedChunksRef.current;
+    if (chunks.length === 0) return;
+
+    setUploading(true);
+    toast.info("녹화본을 저장하는 중...");
+
+    try {
+      const blob = new Blob(chunks, { type: "video/webm" });
+      const duration = Math.floor(
+        (Date.now() - recordingStartTimeRef.current) / 1000
+      );
+
+      // Capture thumbnail
+      let thumbnailBlob: Blob | null = null;
+      const videoEl = videoRef.current?.querySelector("video");
+      if (videoEl) {
+        const canvas = document.createElement("canvas");
+        canvas.width = videoEl.videoWidth || 640;
+        canvas.height = videoEl.videoHeight || 360;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        thumbnailBlob = await new Promise<Blob | null>((r) =>
+          canvas.toBlob(r, "image/webp", 0.8)
+        );
+      }
+
+      const formData = new FormData();
+      formData.append("file", blob, "recording.webm");
+      formData.append("title", title);
+      formData.append("description", description || "");
+      formData.append("streamId", streamId);
+      formData.append("duration", String(duration));
+      if (thumbnailBlob) {
+        formData.append("thumbnail", thumbnailBlob, "thumb.webp");
+      }
+
+      const res = await fetch("/api/upload/recording", {
+        method: "POST",
+        body: formData,
+      });
+      const result = (await res.json()) as ApiResponse<{ recordingId: string }>;
+
+      if (result.success) {
+        toast.success("녹화본이 저장되었습니다");
+      } else {
+        toast.error("녹화본 저장에 실패했습니다");
+      }
+    } catch {
+      toast.error("녹화본 업로드에 실패했습니다");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleEndStream = async () => {
     try {
+      // Upload recording first if enabled
+      if (saveRecording && mediaRecorderRef.current) {
+        await uploadRecording();
+      }
+
       await fetch(`/api/streams/${streamId}`, { method: "PATCH" });
       localAudioRef.current?.close();
       localVideoRef.current?.close();

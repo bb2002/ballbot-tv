@@ -58,8 +58,29 @@ export const subscriptions = sqliteTable(
   ]
 );
 
+export const recordings = sqliteTable(
+  "recordings",
+  {
+    id: text("id").primaryKey(),
+    streamerId: text("streamer_id")
+      .notNull()
+      .references(() => users.id),
+    streamId: text("stream_id").references(() => streams.id),
+    title: text("title").notNull(),
+    description: text("description"),
+    videoKey: text("video_key").notNull(),
+    thumbnailKey: text("thumbnail_key"),
+    duration: integer("duration"), // seconds
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [
+    index("recordings_streamer_idx").on(t.streamerId),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Stream = typeof streams.$inferSelect;
 export type NewStream = typeof streams.$inferInsert;
 export type Subscription = typeof subscriptions.$inferSelect;
+export type Recording = typeof recordings.$inferSelect;

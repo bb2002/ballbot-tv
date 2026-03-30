@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { getEnv } from "@/lib/env";
 import { getDb } from "@/db/client";
 import { getSession } from "@/lib/auth";
 import { isSubscribed, getSubscriberCount } from "@/lib/subscriptions";
 import { getPublicUrl } from "@/lib/storage";
-import { users, streams } from "@/db/schema";
+import { users, streams, recordings } from "@/db/schema";
 import { StreamCard } from "@/components/streaming/StreamCard";
 import ChannelClient from "./channel-client";
 
@@ -48,6 +48,23 @@ export default async function ChannelPage({
     )
     .limit(1);
 
+  const channelRecordings = await db
+    .select()
+    .from(recordings)
+    .where(eq(recordings.streamerId, channelUser.id))
+    .orderBy(desc(recordings.createdAt))
+    .limit(12);
+
+  const recordingsData = channelRecordings.map((rec) => ({
+    id: rec.id,
+    title: rec.title,
+    duration: rec.duration,
+    thumbnailUrl: rec.thumbnailKey
+      ? getPublicUrl(env.R2_PUBLIC_URL, rec.thumbnailKey)
+      : null,
+    createdAt: rec.createdAt,
+  }));
+
   const profileUrl = channelUser.profileImageKey
     ? getPublicUrl(env.R2_PUBLIC_URL, channelUser.profileImageKey)
     : null;
@@ -61,6 +78,7 @@ export default async function ChannelPage({
       isSubscribed={subscribed}
       isLoggedIn={!!session}
       channelId={channelUser.id}
+      recordings={recordingsData}
       liveStream={
         liveStream[0]
           ? {

@@ -24,6 +24,7 @@ export default function StudioPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(true);
+  const [saveRecording, setSaveRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [streamData, setStreamData] = useState<{
     streamId: string;
@@ -79,6 +80,8 @@ export default function StudioPage() {
         streamId={streamData.streamId}
         agoraChannel={streamData.agoraChannel}
         title={title}
+        description={description}
+        saveRecording={saveRecording}
       />
     );
   }
@@ -118,6 +121,17 @@ export default function StudioPage() {
               id="isPublic"
               checked={isPublic}
               onCheckedChange={setIsPublic}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="saveRecording">다시보기 저장</Label>
+              <span className="text-xs text-muted-foreground">방송 종료 후 녹화본을 저장합니다</span>
+            </div>
+            <Switch
+              id="saveRecording"
+              checked={saveRecording}
+              onCheckedChange={setSaveRecording}
             />
           </div>
           <Button onClick={handleStart} disabled={loading}>

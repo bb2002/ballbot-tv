@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { StreamCard } from "@/components/streaming/StreamCard";
+import { RecordingCard } from "@/components/streaming/RecordingCard";
 import { toast } from "sonner";
 
 type Props = {
@@ -14,6 +15,13 @@ type Props = {
   isSubscribed: boolean;
   isLoggedIn: boolean;
   channelId: string;
+  recordings: {
+    id: string;
+    title: string;
+    duration: number | null;
+    thumbnailUrl: string | null;
+    createdAt: Date;
+  }[];
   liveStream: {
     id: string;
     title: string;
@@ -30,6 +38,7 @@ export default function ChannelClient({
   isSubscribed: initialSubscribed,
   isLoggedIn,
   channelId,
+  recordings: channelRecordings,
   liveStream,
 }: Props) {
   const [subscribed, setSubscribed] = useState(initialSubscribed);
@@ -110,6 +119,26 @@ export default function ChannelClient({
           <p className="text-muted-foreground">현재 방송 중이지 않습니다</p>
         )}
       </div>
+
+      {channelRecordings.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-4">다시보기</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {channelRecordings.map((rec) => (
+              <RecordingCard
+                key={rec.id}
+                id={rec.id}
+                title={rec.title}
+                channelName={channelName}
+                duration={rec.duration}
+                thumbnailUrl={rec.thumbnailUrl}
+                profileImageUrl={profileUrl}
+                createdAt={rec.createdAt}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
