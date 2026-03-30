@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Skill(shadcn)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx wrangler:*)",
+      "Bash(mkdir -p 'src/app/\\(auth\\)/signup' 'src/app/\\(auth\\)/signin' src/app/studio 'src/app/watch/[id]' 'src/app/channel/[username]' src/app/mypage)",
+      "Bash(mkdir -p src/app/api/agora/token src/app/api/streams 'src/app/api/streams/[id]/viewer-count')",
+      "Bash(npx vitest:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

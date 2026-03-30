@@ -1,0 +1,1 @@
+ALTER TABLE `streams` ADD `last_heartbeat` integer;
